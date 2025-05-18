@@ -1,0 +1,1349 @@
+function Project
+% Ultimate Function Plotter with Improved UI Layout and Method-Specific Tables
+% Left side: Controls and parameters
+% Right side: Graph and root process tables with method-specific columns
+
+% Clear workspace and command window
+clc;
+
+% Create the main figure with increased width for the two-column layout
+fig = figure('Name', 'Ultimate Function Plotter', ...
+            'Position', [100, 100, 1200, 700], ...  % Wider window for two columns
+            'MenuBar', 'none', ...
+            'ToolBar', 'none', ...
+            'NumberTitle', 'off');
+
+% Create left panel for controls
+left_panel = uipanel('Title', 'Controls', ...
+                    'Position', [0.01, 0.01, 0.38, 0.98], ...
+                    'FontSize', 12, ...
+                    'FontWeight', 'bold');
+
+% Create right panel for visualization
+right_panel = uipanel('Title', 'Visualization', ...
+                     'Position', [0.40, 0.01, 0.59, 0.98], ...
+                     'FontSize', 12, ...
+                     'FontWeight', 'bold');
+
+% ===== LEFT PANEL CONTROLS =====
+
+% Function input section
+function_panel = uipanel('Parent', left_panel, ...
+                        'Title', 'Function Input', ...
+                        'Position', [0.05, 0.80, 0.9, 0.15], ...
+                        'FontSize', 10);
+
+uicontrol('Parent', function_panel, ...
+          'Style', 'text', ...
+          'String', 'Function f(x):', ...
+          'Position', [10, 60, 100, 20], ...
+          'HorizontalAlignment', 'left');
+
+function_edit = uicontrol('Parent', function_panel, ...
+                         'Style', 'edit', ...
+                         'String', 'x^2 - 4', ...  % Default to x^2 - 4 which has two roots
+                         'Position', [110, 60, 200, 25], ...
+                         'HorizontalAlignment', 'left', ...
+                         'FontSize', 10);
+
+% Example dropdown
+uicontrol('Parent', function_panel, ...
+          'Style', 'text', ...
+          'String', 'Examples:', ...
+          'Position', [10, 30, 70, 20], ...
+          'HorizontalAlignment', 'left');
+
+% Examples with natural syntax, including ones with multiple roots
+examples = {'x^2 - 4', 'x^3 - 5*x', 'sin(x)', 'e^-x - x', '3x + sin(x) - e^x', '2 - x', 'x^3 - 2x^2 + 1', 'tan(x)'};
+example_popup = uicontrol('Parent', function_panel, ...
+                         'Style', 'popup', ...
+                         'String', examples, ...
+                         'Position', [80, 30, 230, 20], ...
+                         'Callback', @select_example);
+
+% Help text
+uicontrol('Parent', function_panel, ...
+          'Style', 'text', ...
+          'String', 'Use natural math syntax: x^2, e^-x, 3x, sin(x), etc.', ...
+          'Position', [10, 5, 300, 20], ...
+          'HorizontalAlignment', 'left', ...
+          'FontSize', 9);
+
+% Range and method panel
+range_panel = uipanel('Parent', left_panel, ...
+                     'Title', 'Range and Method', ...
+                     'Position', [0.05, 0.60, 0.9, 0.18], ...
+                     'FontSize', 10);
+
+% X-range inputs
+uicontrol('Parent', range_panel, ...
+          'Style', 'text', ...
+          'String', 'X Min:', ...
+          'Position', [10, 70, 50, 20], ...
+          'HorizontalAlignment', 'left');
+
+x_min_edit = uicontrol('Parent', range_panel, ...
+                      'Style', 'edit', ...
+                      'String', '-3', ...
+                      'Position', [60, 70, 50, 25]);
+
+uicontrol('Parent', range_panel, ...
+          'Style', 'text', ...
+          'String', 'X Max:', ...
+          'Position', [120, 70, 50, 20], ...
+          'HorizontalAlignment', 'left');
+
+x_max_edit = uicontrol('Parent', range_panel, ...
+                      'Style', 'edit', ...
+                      'String', '3', ...
+                      'Position', [170, 70, 50, 25]);
+
+% Method selection
+uicontrol('Parent', range_panel, ...
+          'Style', 'text', ...
+          'String', 'Method:', ...
+          'Position', [10, 40, 50, 20], ...
+          'HorizontalAlignment', 'left');
+
+methods = {'Incremental', 'Bisection', 'False Position', 'Newton-Raphson', 'Secant'};
+method_popup = uicontrol('Parent', range_panel, ...
+                        'Style', 'popup', ...
+                        'String', methods, ...
+                        'Position', [60, 40, 160, 25], ...
+                        'Value', 1, ...  % Default to Incremental
+                        'Callback', @method_changed);  % Add callback for method change
+
+% Tolerance input
+uicontrol('Parent', range_panel, ...
+          'Style', 'text', ...
+          'String', 'Tolerance:', ...
+          'Position', [10, 10, 70, 20], ...
+          'HorizontalAlignment', 'left');
+
+tolerance_edit = uicontrol('Parent', range_panel, ...
+                          'Style', 'edit', ...
+                          'String', '1e-6', ...
+                          'Position', [80, 10, 60, 20]);
+
+% Max iterations input
+uicontrol('Parent', range_panel, ...
+          'Style', 'text', ...
+          'String', 'Max Iter:', ...
+          'Position', [150, 10, 60, 20], ...
+          'HorizontalAlignment', 'left');
+
+max_iter_edit = uicontrol('Parent', range_panel, ...
+                         'Style', 'edit', ...
+                         'String', '50', ...
+                         'Position', [210, 10, 40, 20]);
+
+% Method-specific parameters panel
+method_params_panel = uipanel('Parent', left_panel, ...
+                            'Title', 'Method-Specific Parameters', ...
+                            'Position', [0.05, 0.45, 0.9, 0.13], ...
+                            'FontSize', 10);
+
+% Step size input (for Incremental method)
+step_size_text = uicontrol('Parent', method_params_panel, ...
+                          'Style', 'text', ...
+                          'String', 'Step Size:', ...
+                          'Position', [10, 50, 70, 20], ...
+                          'HorizontalAlignment', 'left');
+
+step_size_edit = uicontrol('Parent', method_params_panel, ...
+                          'Style', 'edit', ...
+                          'String', '0.1', ...  % Default step size
+                          'Position', [80, 50, 60, 20]);
+
+% Secant method initial guesses (initially hidden)
+secant_x0_text = uicontrol('Parent', method_params_panel, ...
+                          'Style', 'text', ...
+                          'String', 'First Guess (x0):', ...
+                          'Position', [10, 30, 100, 20], ...
+                          'HorizontalAlignment', 'left', ...
+                          'Visible', 'off');
+
+secant_x0_edit = uicontrol('Parent', method_params_panel, ...
+                          'Style', 'edit', ...
+                          'String', '0', ...  % Default first guess
+                          'Position', [110, 30, 60, 20], ...
+                          'Visible', 'off');
+
+secant_x1_text = uicontrol('Parent', method_params_panel, ...
+                          'Style', 'text', ...
+                          'String', 'Second Guess (x1):', ...
+                          'Position', [10, 5, 110, 20], ...
+                          'HorizontalAlignment', 'left', ...
+                          'Visible', 'off');
+
+secant_x1_edit = uicontrol('Parent', method_params_panel, ...
+                          'Style', 'edit', ...
+                          'String', '1', ...  % Default second guess
+                          'Position', [120, 5, 60, 20], ...
+                          'Visible', 'off');
+
+% Newton method initial guess (initially hidden)
+newton_x0_text = uicontrol('Parent', method_params_panel, ...
+                          'Style', 'text', ...
+                          'String', 'Initial Guess (x0):', ...
+                          'Position', [10, 30, 110, 20], ...
+                          'HorizontalAlignment', 'left', ...
+                          'Visible', 'off');
+
+newton_x0_edit = uicontrol('Parent', method_params_panel, ...
+                          'Style', 'edit', ...
+                          'String', '0', ...  % Default initial guess
+                          'Position', [120, 30, 60, 20], ...
+                          'Visible', 'off');
+
+% Action buttons panel
+action_panel = uipanel('Parent', left_panel, ...
+                      'Title', 'Actions', ...
+                      'Position', [0.05, 0.35, 0.9, 0.08], ...
+                      'FontSize', 10);
+
+% Action buttons
+plot_button = uicontrol('Parent', action_panel, ...
+                       'Style', 'pushbutton', ...
+                       'String', 'Plot', ...
+                       'Position', [30, 10, 100, 30], ...
+                       'FontSize', 10, ...
+                       'FontWeight', 'bold', ...
+                       'Callback', @plot_function);
+
+clear_button = uicontrol('Parent', action_panel, ...
+                       'Style', 'pushbutton', ...
+                       'String', 'Clear', ...
+                       'Position', [170, 10, 100, 30], ...
+                       'FontSize', 10, ...
+                       'Callback', @clear_all);
+
+% Results panel
+results_panel = uipanel('Parent', left_panel, ...
+                       'Title', 'Results', ...
+                       'Position', [0.05, 0.05, 0.9, 0.28], ...
+                       'FontSize', 10);
+
+% Create text area for results/status
+results_text = uicontrol('Parent', results_panel, ...
+                        'Style', 'text', ...
+                        'String', 'Enter a function and click "Plot"', ...
+                        'Position', [10, 120, 320, 20], ...
+                        'HorizontalAlignment', 'left', ...
+                        'FontName', 'Arial', ...
+                        'FontSize', 10);
+
+% Create roots summary text
+roots_text = uicontrol('Parent', results_panel, ...
+                     'Style', 'text', ...
+                     'String', 'No roots found yet. Enter a function and click "Plot".', ...
+                     'Position', [10, 90, 320, 20], ...
+                     'HorizontalAlignment', 'left', ...
+                     'FontName', 'Arial', ...
+                     'FontSize', 10);
+
+% Create roots summary list
+roots_list = uicontrol('Parent', results_panel, ...
+                      'Style', 'listbox', ...
+                      'String', {'No roots found yet'}, ...
+                      'Position', [10, 10, 320, 70], ...
+                      'HorizontalAlignment', 'left', ...
+                      'FontName', 'Courier New', ...  % Monospaced font for better alignment
+                      'FontSize', 9);
+
+% ===== RIGHT PANEL VISUALIZATION =====
+
+% Create axes for plotting
+ax = axes('Parent', right_panel, ...
+         'Position', [0.1, 0.55, 0.85, 0.4]);
+
+% Create tabbed panel for root iterations
+iterations_tabgroup = uitabgroup('Parent', right_panel, ...
+                                'Position', [0.05, 0.05, 0.9, 0.45]);
+
+% Create default tab
+default_tab = uitab(iterations_tabgroup, 'Title', 'No Roots Found');
+
+% Create default text in the default tab
+uicontrol('Parent', default_tab, ...
+         'Style', 'text', ...
+         'String', 'No roots found yet. Enter a function and click "Plot".', ...
+         'Position', [20, 100, 500, 20], ...
+         'HorizontalAlignment', 'left');
+
+% Store handles in figure's UserData for access in callbacks
+handles = struct('function_edit', function_edit, ...
+                'x_min_edit', x_min_edit, ...
+                'x_max_edit', x_max_edit, ...
+                'method_popup', method_popup, ...
+                'tolerance_edit', tolerance_edit, ...
+                'max_iter_edit', max_iter_edit, ...
+                'step_size_text', step_size_text, ...
+                'step_size_edit', step_size_edit, ...
+                'secant_x0_text', secant_x0_text, ...
+                'secant_x0_edit', secant_x0_edit, ...
+                'secant_x1_text', secant_x1_text, ...
+                'secant_x1_edit', secant_x1_edit, ...
+                'newton_x0_text', newton_x0_text, ...
+                'newton_x0_edit', newton_x0_edit, ...
+                'ax', ax, ...
+                'roots_text', roots_text, ...
+                'roots_list', roots_list, ...
+                'iterations_tabgroup', iterations_tabgroup, ...
+                'default_tab', default_tab, ...
+                'results_text', results_text);
+
+set(fig, 'UserData', handles);
+
+% Initialize the plot
+initialize_plot(ax);
+
+% Method changed callback
+function method_changed(~, ~)
+    % Get handles
+    handles = get(gcf, 'UserData');
+    
+    % Get selected method
+    method_idx = get(handles.method_popup, 'Value');
+    method_name = methods{method_idx};
+    
+    % Hide all method-specific controls
+    set(handles.step_size_text, 'Visible', 'off');
+    set(handles.step_size_edit, 'Visible', 'off');
+    set(handles.secant_x0_text, 'Visible', 'off');
+    set(handles.secant_x0_edit, 'Visible', 'off');
+    set(handles.secant_x1_text, 'Visible', 'off');
+    set(handles.secant_x1_edit, 'Visible', 'off');
+    set(handles.newton_x0_text, 'Visible', 'off');
+    set(handles.newton_x0_edit, 'Visible', 'off');
+    
+    % Show method-specific controls based on selected method
+    switch method_name
+        case 'Incremental'
+            set(handles.step_size_text, 'Visible', 'on');
+            set(handles.step_size_edit, 'Visible', 'on');
+        case 'Secant'
+            set(handles.secant_x0_text, 'Visible', 'on');
+            set(handles.secant_x0_edit, 'Visible', 'on');
+            set(handles.secant_x1_text, 'Visible', 'on');
+            set(handles.secant_x1_edit, 'Visible', 'on');
+        case 'Newton-Raphson'
+            set(handles.newton_x0_text, 'Visible', 'on');
+            set(handles.newton_x0_edit, 'Visible', 'on');
+    end
+end
+
+% Example selection callback
+function select_example(source, ~)
+    % Get selected example
+    selected_idx = get(source, 'Value');
+    selected_example = examples{selected_idx};
+    
+    % Set the function edit field
+    set(function_edit, 'String', selected_example);
+end
+
+% Clear all button callback
+function clear_all(~, ~)
+    % Get handles
+    handles = get(gcf, 'UserData');
+    
+    % Clear the plot
+    initialize_plot(handles.ax);
+    
+    % Reset results text
+    set(handles.results_text, 'String', 'Enter a function and click "Plot"');
+    
+    % Reset roots text
+    set(handles.roots_text, 'String', 'No roots found yet. Enter a function and click "Plot".');
+    
+    % Reset roots list
+    set(handles.roots_list, 'String', {'No roots found yet'});
+    
+    % Clear the tabgroup
+    delete(get(handles.iterations_tabgroup, 'Children'));
+    handles.default_tab = uitab(handles.iterations_tabgroup, 'Title', 'No Roots Found');
+    
+    % Create default text in the default tab
+    uicontrol('Parent', handles.default_tab, ...
+             'Style', 'text', ...
+             'String', 'No roots found yet. Enter a function and click "Plot".', ...
+             'Position', [20, 100, 500, 20], ...
+             'HorizontalAlignment', 'left');
+    
+    % Update handles
+    set(gcf, 'UserData', handles);
+end
+
+% Plot function callback
+function plot_function(~, ~)
+    % Get handles
+    handles = get(gcf, 'UserData');
+    
+    % Get function string
+    func_str = get(handles.function_edit, 'String');
+    
+    % Remove "f(x) =" or similar prefix if present
+    func_str = remove_function_prefix(func_str);
+    
+    % Get x range
+    try
+        x_min = str2double(get(handles.x_min_edit, 'String'));
+        x_max = str2double(get(handles.x_max_edit, 'String'));
+        
+        if isnan(x_min) || isnan(x_max)
+            set(handles.results_text, 'String', 'Error: Invalid x range values.');
+            return;
+        end
+        
+        if x_min >= x_max
+            set(handles.results_text, 'String', 'Error: Minimum x must be less than maximum x.');
+            return;
+        end
+    catch
+        set(handles.results_text, 'String', 'Error: Invalid x range values.');
+        return;
+    end
+    
+    % Get tolerance, max iterations, and step size
+    try
+        tolerance = str2double(get(handles.tolerance_edit, 'String'));
+        max_iter = str2double(get(handles.max_iter_edit, 'String'));
+        
+        if isnan(tolerance) || tolerance <= 0
+            set(handles.results_text, 'String', 'Error: Invalid tolerance value.');
+            return;
+        end
+        
+        if isnan(max_iter) || max_iter <= 0 || max_iter ~= round(max_iter)
+            set(handles.results_text, 'String', 'Error: Invalid max iterations value.');
+            return;
+        end
+    catch
+        set(handles.results_text, 'String', 'Error: Invalid tolerance or max iterations.');
+        return;
+    end
+    
+    % Get method-specific parameters
+    method_idx = get(handles.method_popup, 'Value');
+    method_name = methods{method_idx};
+    
+    % For Incremental method, get step size
+    if strcmp(method_name, 'Incremental')
+        try
+            step_size = str2double(get(handles.step_size_edit, 'String'));
+            
+            if isnan(step_size) || step_size <= 0
+                set(handles.results_text, 'String', 'Error: Invalid step size value.');
+                return;
+            end
+        catch
+            set(handles.results_text, 'String', 'Error: Invalid step size.');
+            return;
+        end
+    else
+        % Default step size for other methods
+        step_size = 0.1;
+    end
+    
+    % For Secant method, get initial guesses
+    if strcmp(method_name, 'Secant')
+        try
+            secant_x0 = str2double(get(handles.secant_x0_edit, 'String'));
+            secant_x1 = str2double(get(handles.secant_x1_edit, 'String'));
+            
+            if isnan(secant_x0) || isnan(secant_x1)
+                set(handles.results_text, 'String', 'Error: Invalid Secant method initial guesses.');
+                return;
+            end
+            
+            % Check if guesses are within range
+            if secant_x0 < x_min || secant_x0 > x_max || secant_x1 < x_min || secant_x1 > x_max
+                set(handles.results_text, 'String', 'Warning: Secant method initial guesses should be within the x range.');
+                % Continue anyway, as the user might know what they're doing
+            end
+            
+            % Check if guesses are the same
+            if abs(secant_x0 - secant_x1) < 1e-10
+                set(handles.results_text, 'String', 'Error: Secant method initial guesses must be different.');
+                return;
+            end
+        catch
+            set(handles.results_text, 'String', 'Error: Invalid Secant method initial guesses.');
+            return;
+        end
+    end
+    
+    % For Newton method, get initial guess
+    if strcmp(method_name, 'Newton-Raphson')
+        try
+            newton_x0 = str2double(get(handles.newton_x0_edit, 'String'));
+            
+            if isnan(newton_x0)
+                set(handles.results_text, 'String', 'Error: Invalid Newton-Raphson method initial guess.');
+                return;
+            end
+            
+            % Check if guess is within range
+            if newton_x0 < x_min || newton_x0 > x_max
+                set(handles.results_text, 'String', 'Warning: Newton-Raphson method initial guess should be within the x range.');
+                % Continue anyway, as the user might know what they're doing
+            end
+        catch
+            set(handles.results_text, 'String', 'Error: Invalid Newton-Raphson method initial guess.');
+            return;
+        end
+    end
+    
+    % Convert the function string to MATLAB-compatible syntax
+    matlab_func_str = convert_to_matlab_syntax(func_str);
+    
+    % Display the conversion if it was changed
+    if ~strcmp(func_str, matlab_func_str)
+        set(handles.results_text, 'String', ['Converting "', func_str, '" to MATLAB syntax: "', matlab_func_str, '"']);
+    end
+    
+    % Create function handle using direct string evaluation
+    try
+        % Create a function handle directly from the string
+        func_handle = str2func(['@(x) ' matlab_func_str]);
+        
+        % Test the function with a simple value to check for errors
+        try
+            test_value = func_handle(1);
+            if ~isfinite(test_value) && ~isnan(test_value)
+                set(handles.results_text, 'String', 'Warning: Function may have singularities.');
+            end
+        catch e
+            % If test fails, function might be invalid
+            set(handles.results_text, 'String', ['Error evaluating function: ', e.message, '. Check syntax.']);
+            return;
+        end
+    catch e
+        set(handles.results_text, 'String', ['Error creating function: ', e.message]);
+        return;
+    end
+    
+    % Create derivative function handle for methods that need it
+    try
+        % For Newton-Raphson method, we need the derivative
+        % Use finite difference approximation
+        h = 1e-6;  % Small step for finite difference
+        df_handle = @(x) (func_handle(x + h) - func_handle(x - h)) / (2 * h);
+    catch e
+        set(handles.results_text, 'String', ['Error creating derivative function: ', e.message]);
+        return;
+    end
+    
+    % Plot the function
+    try
+        % Generate x values
+        x_plot = linspace(x_min, x_max, 1000);
+        
+        % Evaluate function
+        y_plot = func_handle(x_plot);
+        
+        % Check for invalid values
+        if any(~isfinite(y_plot))
+            % Replace Inf and NaN with NaN to avoid plotting issues
+            y_plot(~isfinite(y_plot)) = NaN;
+            set(handles.results_text, 'String', 'Warning: Function has singularities in the given range.');
+        end
+        
+        % Clear previous plot
+        cla(handles.ax);
+        
+        % Plot function
+        plot(handles.ax, x_plot, y_plot, 'b-', 'LineWidth', 2);
+        
+        % Add x and y axes
+        hold(handles.ax, 'on');
+        
+        % Add x-axis if it's in the visible range
+        y_lim = get(handles.ax, 'YLim');
+        if y_lim(1) <= 0 && y_lim(2) >= 0
+            plot(handles.ax, [x_min, x_max], [0, 0], 'k-', 'LineWidth', 0.5);
+        end
+        
+        % Add y-axis if it's in the visible range
+        if x_min <= 0 && x_max >= 0
+            plot(handles.ax, [0, 0], y_lim, 'k-', 'LineWidth', 0.5);
+        end
+        
+        % Set labels and title
+        title(handles.ax, ['f(x) = ', func_str]);  % Show original input in title
+        xlabel(handles.ax, 'x');
+        ylabel(handles.ax, 'f(x)');
+        grid(handles.ax, 'on');
+        
+        % Initialize variables for storing roots
+        roots = [];
+        iterations_data = {};
+        
+        % Find and mark roots based on selected method
+        if strcmp(method_name, 'Secant')
+            % Use custom initial guesses for Secant method
+            [roots, iterations_data] = find_roots_secant(func_handle, secant_x0, secant_x1, x_min, x_max, tolerance, max_iter);
+        elseif strcmp(method_name, 'Newton-Raphson')
+            % Use custom initial guess for Newton method
+            [roots, iterations_data] = find_roots_newton(func_handle, df_handle, newton_x0, x_min, x_max, tolerance, max_iter);
+        else
+            % Use standard method selection for other methods
+            [roots, iterations_data] = find_roots_with_method(func_handle, df_handle, x_min, x_max, method_name, tolerance, max_iter, step_size);
+        end
+        
+        % Mark the roots on the plot
+        for i = 1:length(roots)
+            root = roots(i);
+            
+            % Mark the root on the plot
+            plot(handles.ax, root, 0, 'ro', 'MarkerSize', 8, 'MarkerFaceColor', 'r');
+            text(handles.ax, root, 0.1, ['Root ', num2str(i), ': ', num2str(root, '%.6f')], ...
+                'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'center', ...
+                'BackgroundColor', [1 1 1 0.7]);
+        end
+        
+        % Update the roots summary and list
+        if ~isempty(roots)
+            % Update the roots text
+            summary_str = ['Found ', num2str(length(roots)), ' root(s) using ', method_name, ' method:'];
+            
+            % Create a cell array for the roots list
+            roots_list_data = cell(length(roots) + 2, 1);
+            roots_list_data{1} = ['Found ', num2str(length(roots)), ' root(s) using ', method_name, ' method:'];
+            roots_list_data{2} = '---------------------------------------------------';
+            
+            % Build detailed root information for both displays
+            for i = 1:length(roots)
+                % For the summary text (single line)
+                root_value = roots(i);
+                func_value = func_handle(root_value);
+                root_info = ['  Root ', num2str(i), ': x = ', num2str(root_value, '%.6f'), ' f(x) = ', num2str(func_value, '%.8f')];
+                summary_str = [summary_str, root_info];
+                
+                % For the list box (separate lines)
+                roots_list_data{i+2} = sprintf('Root %d: x = %12.8f, f(x) = %12.8e', i, root_value, func_value);
+            end
+            
+            % Update the displays
+            set(handles.roots_text, 'String', summary_str);
+            set(handles.roots_list, 'String', roots_list_data);
+            set(handles.results_text, 'String', ['Successfully found ', num2str(length(roots)), ' root(s). See details in the tabs below.']);
+            
+            % Clear previous tabs
+            delete(get(handles.iterations_tabgroup, 'Children'));
+            
+            % Create a tab for each root
+            for i = 1:length(roots)
+                % Create a tab for this root
+                root_tab = uitab(iterations_tabgroup, 'Title', ['Root ', num2str(i), ': ', num2str(roots(i), '%.4f')]);
+                
+                % Create method-specific table headers and data display
+                switch method_name
+                    case 'Incremental'
+                        % Create the table with the iteration data for Incremental method
+                        % Headers: xl, Δx, xu, f(xl), f(xu), f(xl)*f(xu), Remarks
+                        table_headers = {'xl', 'Δx', 'xu', 'f(xl)', 'f(xu)', 'f(xl)*f(xu)', 'Remarks'};
+                        column_widths = {70, 70, 70, 70, 70, 100, 150};
+                    case 'Bisection'
+                        % Create the table with the iteration data for Bisection method
+                        % Headers: xl, xr, xu, f(xl), f(xu), |ϵa|,%, f(xl)*f(xu), Remarks
+                        table_headers = {'xl', 'xr', 'xu', 'f(xl)', 'f(xu)', '|ϵa|,%', 'f(xl)*f(xu)', 'Remarks'};
+                        column_widths = {70, 70, 70, 70, 70, 70, 100, 130};
+                    case 'False Position'
+                        % Create the table with the iteration data for False Position method
+                        % Headers: xl, xu, xr, ϵa, f(xl), f(xu), f(xr), f(xl)*f(xr), Remarks
+                        table_headers = {'xl', 'xu', 'xr', 'ϵa', 'f(xl)', 'f(xu)', 'f(xr)', 'f(xl)*f(xr)', 'Remarks'};
+                        column_widths = {60, 60, 60, 60, 60, 60, 60, 100, 110};
+                    case 'Newton-Raphson'
+                        % Create the table with the iteration data for Newton-Raphson method
+                        % Headers: xl, ϵa, f(x), f'(xu)
+                        table_headers = {'xl', 'ϵa', 'f(x)', 'f''(xu)'};
+                        column_widths = {100, 100, 100, 100};
+                    case 'Secant'
+                        % Create the table with the iteration data for Secant method
+                        % Headers: xi-1, xi, xi+1, ϵa, f(xi-1), f(xi), f(xi+1)
+                        table_headers = {'xi-1', 'xi', 'xi+1', 'ϵa', 'f(xi-1)', 'f(xi)', 'f(xi+1)'};
+                        column_widths = {80, 80, 80, 80, 80, 80, 80};
+                end
+                
+                % Create the table with the iteration data for this root
+                if ~isempty(iterations_data) && i <= length(iterations_data)
+                    uitable('Parent', root_tab, ...
+                            'Position', [20, 20, 650, 250], ...
+                            'ColumnName', table_headers, ...
+                            'ColumnWidth', column_widths, ...
+                            'Data', iterations_data{i});
+                end
+            end
+        else
+            % Update both the roots text and list for no roots found
+            set(handles.roots_text, 'String', ['No roots found using ', method_name, ' method in the given range.']);
+            set(handles.roots_list, 'String', {['No roots found using ', method_name, ' method in the given range.']});
+            set(handles.results_text, 'String', 'No roots found. Try a different function, range, or method.');
+            
+            % Clear previous tabs and create a "No Roots" tab
+            delete(get(handles.iterations_tabgroup, 'Children'));
+            no_roots_tab = uitab(iterations_tabgroup, 'Title', 'No Roots Found');
+            
+            % Create text in the tab
+            uicontrol('Parent', no_roots_tab, ...
+                     'Style', 'text', ...
+                     'String', ['No roots found using ', method_name, ' method in the given range.'], ...
+                     'Position', [20, 100, 500, 20], ...
+                     'HorizontalAlignment', 'left');
+        end
+    catch e
+        set(handles.results_text, 'String', ['Error plotting function: ', e.message]);
+        disp(['Error details: ', getReport(e)]);  % Print detailed error for debugging
+    end
+end
+
+% Initialize plot
+function initialize_plot(ax)
+    % Set up empty plot
+    cla(ax);
+    title(ax, 'Function Plot');
+    xlabel(ax, 'x');
+    ylabel(ax, 'f(x)');
+    grid(ax, 'on');
+    
+    % Set default limits
+    xlim(ax, [-5, 5]);
+    ylim(ax, [-5, 5]);
+    
+    % Add x and y axes
+    hold(ax, 'on');
+    plot(ax, [0, 0], [-5, 5], 'k-', 'LineWidth', 0.5);
+    plot(ax, [-5, 5], [0, 0], 'k-', 'LineWidth', 0.5);
+    hold(ax, 'off');
+end
+
+% Find roots using the Secant method with custom initial guesses
+function [roots, iterations_data] = find_roots_secant(func, x0, x1, x_min, x_max, tolerance, max_iter)
+    % Initialize
+    roots = [];
+    iterations_data = {};
+    
+    % Apply the Secant method with custom initial guesses
+    [root, iter_data] = secant_method(func, x0, x1, tolerance, max_iter);
+    
+    % If a valid root was found
+    if ~isempty(root) && isfinite(root) && root >= x_min && root <= x_max
+        roots = [roots, root];
+        iterations_data{end+1} = iter_data;
+    end
+end
+
+% Find roots using the Newton-Raphson method with custom initial guess
+function [roots, iterations_data] = find_roots_newton(func, dfunc, x0, x_min, x_max, tolerance, max_iter)
+    % Initialize
+    roots = [];
+    iterations_data = {};
+    
+    % Apply the Newton-Raphson method with custom initial guess
+    [root, iter_data] = newton_raphson_method(func, dfunc, x0, tolerance, max_iter);
+    
+    % If a valid root was found
+    if ~isempty(root) && isfinite(root) && root >= x_min && root <= x_max
+        roots = [roots, root];
+        iterations_data{end+1} = iter_data;
+    end
+end
+
+% Find roots using the selected method
+function [roots, iterations_data] = find_roots_with_method(func, dfunc, x_min, x_max, method_name, tolerance, max_iter, step_size)
+    % Initialize
+    roots = [];
+    iterations_data = {};
+    
+    % For the Incremental method, we need to search the entire range
+    if strcmp(method_name, 'Incremental')
+        [roots, iterations_data] = incremental_search_method(func, x_min, x_max, step_size, tolerance, max_iter);
+    else
+        % For other methods, we first need to find potential root intervals
+        % Number of initial segments to check
+        num_segments = 100;
+        
+        % Generate points to check for sign changes
+        x_check = linspace(x_min, x_max, num_segments + 1);
+        y_check = func(x_check);
+        
+        % Find potential root intervals
+        root_intervals = [];
+        for i = 1:num_segments
+            % Skip if either value is NaN or Inf
+            if ~isfinite(y_check(i)) || ~isfinite(y_check(i+1))
+                continue;
+            end
+            
+            % Check for sign change
+            if y_check(i) * y_check(i+1) <= 0
+                root_intervals = [root_intervals; x_check(i), x_check(i+1)];
+            end
+        end
+        
+        % If no sign changes found, try to find local minima/maxima near zero
+        if isempty(root_intervals)
+            set(handles.results_text, 'String', 'No sign changes found. Trying to find local minima/maxima near zero...');
+            
+            % Find where the function is closest to zero
+            [~, min_idx] = min(abs(y_check));
+            if min_idx > 1 && min_idx < length(x_check)
+                root_intervals = [root_intervals; x_check(min_idx-1), x_check(min_idx+1)];
+            end
+        end
+        
+        % If still no intervals found
+        if isempty(root_intervals)
+            set(handles.results_text, 'String', 'No potential root intervals found in the given range.');
+            return;
+        end
+        
+        % Process each potential root interval
+        for interval_idx = 1:size(root_intervals, 1)
+            a = root_intervals(interval_idx, 1);
+            b = root_intervals(interval_idx, 2);
+            
+            % Apply the selected root-finding method
+            switch method_name
+                case 'Bisection'
+                    [root, iter_data] = bisection_method(func, a, b, tolerance, max_iter);
+                case 'False Position'
+                    [root, iter_data] = false_position_method(func, a, b, tolerance, max_iter);
+                case 'Newton-Raphson'
+                    % For Newton, start at the midpoint of the interval
+                    x0 = (a + b) / 2;
+                    [root, iter_data] = newton_raphson_method(func, dfunc, x0, tolerance, max_iter);
+                case 'Secant'
+                    % For Secant, use the interval endpoints
+                    [root, iter_data] = secant_method(func, a, b, tolerance, max_iter);
+            end
+            
+            % If a valid root was found
+            if ~isempty(root) && isfinite(root) && root >= x_min && root <= x_max
+                % Check if this root is already in our list (within tolerance)
+                is_duplicate = false;
+                for j = 1:length(roots)
+                    if abs(root - roots(j)) < tolerance * 10
+                        is_duplicate = true;
+                        break;
+                    end
+                end
+                
+                if ~is_duplicate
+                    roots = [roots, root];
+                    iterations_data{end+1} = iter_data;
+                end
+            end
+        end
+    end
+end
+
+% Incremental Search Method
+function [roots, all_iterations] = incremental_search_method(func, x_min, x_max, step_size, tol, max_iter)
+    % Initialize
+    roots = [];
+    all_iterations = {};
+    
+    % Start at the left endpoint
+    x = x_min;
+    
+    % Evaluate function at starting point
+    fx = func(x);
+    
+    % Initialize iteration data for the first interval
+    iter_data = cell(1, 7);  % 7 columns based on the required format
+    iter_count = 0;
+    
+    % Main loop
+    while x <= x_max - step_size
+        % Next point
+        next_x = x + step_size;
+        
+        % Evaluate function at next point
+        next_fx = func(next_x);
+        
+        % Record this step
+        iter_count = iter_count + 1;
+        
+        % Make sure the iteration data cell array is large enough
+        if iter_count > size(iter_data, 1)
+            % Add more rows (double the current size)
+            iter_data = [iter_data; cell(size(iter_data, 1), 7)];
+        end
+        
+        % Calculate product to check for sign change
+        product = fx * next_fx;
+        
+        % Create a remarks field
+        if product <= 0
+            remarks = 'Sign change detected! Possible root in interval.';
+        else
+            remarks = 'No sign change in this interval.';
+        end
+        
+        % Store data according to the incremental method requirements
+        % xl, Δx, xu, f(xl), f(xu), f(xl)*f(xu), Remarks
+        iter_data{iter_count, 1} = x;                 % xl
+        iter_data{iter_count, 2} = step_size;         % Δx
+        iter_data{iter_count, 3} = next_x;            % xu
+        iter_data{iter_count, 4} = fx;                % f(xl)
+        iter_data{iter_count, 5} = next_fx;           % f(xu)
+        iter_data{iter_count, 6} = product;           % f(xl)*f(xu)
+        iter_data{iter_count, 7} = remarks;           % Remarks
+        
+        % Check for sign change
+        if product <= 0
+            % A root exists in [x, next_x]
+            
+            % Refine the root using bisection
+            [refined_root, refined_iterations] = refine_root_bisection(func, x, next_x, tol, max_iter);
+            
+            % Check if the root is valid and not a duplicate
+            if ~isempty(refined_root)
+                % Check for duplicates
+                is_duplicate = false;
+                for i = 1:length(roots)
+                    if abs(refined_root - roots(i)) < tol * 10
+                        is_duplicate = true;
+                        break;
+                    end
+                end
+                
+                if ~is_duplicate
+                    % Add the refined root
+                    roots = [roots, refined_root];
+                    
+                    % Trim unused rows
+                    if iter_count < size(iter_data, 1)
+                        iter_data = iter_data(1:iter_count, :);
+                    end
+                    
+                    % For incremental method, we just store the refinement iterations for each root
+                    all_iterations{end+1} = refined_iterations;
+                end
+            end
+        end
+        
+        % Move to the next interval
+        x = next_x;
+        fx = next_fx;
+    end
+    
+    % If no roots were found but we did iterations, store them
+    if isempty(roots) && iter_count > 0
+        if iter_count < size(iter_data, 1)
+            iter_data = iter_data(1:iter_count, :);
+        end
+        all_iterations{1} = iter_data;
+    end
+end
+
+% Refine root using bisection (for incremental method)
+function [root, iter_data] = refine_root_bisection(func, a, b, tol, max_iter)
+    % Initialize
+    iter_data = cell(max_iter, 8);  % Using Bisection format for refinement
+    fa = func(a);
+    fb = func(b);
+    
+    % Check if the function actually changes sign in the interval
+    if fa * fb > 0
+        root = [];
+        return;
+    end
+    
+    % Iteration loop
+    for i = 1:max_iter
+        % Compute midpoint
+        c = (a + b) / 2;
+        fc = func(c);
+        
+        % Calculate error (interval width)
+        error = (b - a) / 2;
+        error_percent = 100 * error / abs(c);  % Error as percentage
+        
+        % Calculate sign check
+        sign_check = fa * fc;
+        
+        % Determine remarks
+        if abs(fc) < tol || error < tol
+            remarks = 'Convergence achieved!';
+        else
+            if sign_check < 0
+                remarks = 'Root is in the left half of interval.';
+            else
+                remarks = 'Root is in the right half of interval.';
+            end
+        end
+        
+        % Store iteration data according to Bisection format
+        % xl, xr, xu, f(xl), f(xu), |ϵa|,%, f(xl)*f(xu), Remarks
+        iter_data{i, 1} = a;               % xl
+        iter_data{i, 2} = c;               % xr
+        iter_data{i, 3} = b;               % xu
+        iter_data{i, 4} = fa;              % f(xl)
+        iter_data{i, 5} = fb;              % f(xu)
+        iter_data{i, 6} = error_percent;   % |ϵa|,%
+        iter_data{i, 7} = sign_check;      % f(xl)*f(xu)
+        iter_data{i, 8} = remarks;         % Remarks
+        
+        % Check for convergence
+        if abs(fc) < tol || error < tol
+            root = c;
+            % Trim unused rows
+            iter_data = iter_data(1:i, :);
+            return;
+        end
+        
+        % Update interval
+        if fa * fc < 0
+            b = c;
+            fb = fc;
+        else
+            a = c;
+            fa = fc;
+        end
+    end
+    
+    % If we reach here, we've hit max iterations
+    root = (a + b) / 2;
+    iter_data = iter_data(1:max_iter, :);
+end
+
+% Bisection Method
+function [root, iter_data] = bisection_method(func, a, b, tol, max_iter)
+    % Initialize
+    iter_data = cell(max_iter, 8);  % 8 columns based on the required format
+    fa = func(a);
+    fb = func(b);
+    
+    % Check if the function actually changes sign in the interval
+    if fa * fb > 0
+        root = [];
+        return;
+    end
+    
+    % Iteration loop
+    for i = 1:max_iter
+        % Compute midpoint
+        c = (a + b) / 2;
+        fc = func(c);
+        
+        % Calculate error (interval width)
+        error = (b - a) / 2;
+        error_percent = 100 * error / abs(c);  % Error as percentage
+        
+        % Calculate sign check
+        sign_check = fa * fc;
+        
+        % Determine remarks
+        if abs(fc) < tol || error < tol
+            remarks = 'Convergence achieved!';
+        else
+            if sign_check < 0
+                remarks = 'Root is in the left half of interval.';
+            else
+                remarks = 'Root is in the right half of interval.';
+            end
+        end
+        
+        % Store iteration data according to Bisection format
+        % xl, xr, xu, f(xl), f(xu), |ϵa|,%, f(xl)*f(xu), Remarks
+        iter_data{i, 1} = a;               % xl
+        iter_data{i, 2} = c;               % xr
+        iter_data{i, 3} = b;               % xu
+        iter_data{i, 4} = fa;              % f(xl)
+        iter_data{i, 5} = fb;              % f(xu)
+        iter_data{i, 6} = error_percent;   % |ϵa|,%
+        iter_data{i, 7} = sign_check;      % f(xl)*f(xu)
+        iter_data{i, 8} = remarks;         % Remarks
+        
+        % Check for convergence
+        if abs(fc) < tol || error < tol
+            root = c;
+            % Trim unused rows
+            iter_data = iter_data(1:i, :);
+            return;
+        end
+        
+        % Update interval
+        if fa * fc < 0
+            b = c;
+            fb = fc;
+        else
+            a = c;
+            fa = fc;
+        end
+    end
+    
+    % If we reach here, we've hit max iterations
+    root = (a + b) / 2;
+    iter_data = iter_data(1:max_iter, :);
+end
+
+% False Position (Regula Falsi) Method
+function [root, iter_data] = false_position_method(func, a, b, tol, max_iter)
+    % Initialize
+    iter_data = cell(max_iter, 9);  % 9 columns based on the required format
+    fa = func(a);
+    fb = func(b);
+    
+    % Check if the function actually changes sign in the interval
+    if fa * fb > 0
+        root = [];
+        return;
+    end
+    
+    % Initial values
+    c_prev = a;  % Previous approximation
+    
+    % Iteration loop
+    for i = 1:max_iter
+        % Compute false position
+        c = (a * fb - b * fa) / (fb - fa);
+        fc = func(c);
+        
+        % Calculate error
+        error = abs(c - c_prev);
+        if i > 1
+            error_percent = 100 * error / abs(c);  % Percent error
+        else
+            error_percent = NaN;  % No previous value for first iteration
+        end
+        c_prev = c;
+        
+        % Calculate sign check
+        sign_check = fa * fc;
+        
+        % Determine remarks
+        if abs(fc) < tol || error < tol
+            remarks = 'Convergence achieved!';
+        else
+            if sign_check < 0
+                remarks = 'Root is in the left subinterval.';
+            else
+                remarks = 'Root is in the right subinterval.';
+            end
+        end
+        
+        % Store iteration data according to False Position format
+        % xl, xu, xr, ϵa, f(xl), f(xu), f(xr), f(xl)*f(xr), Remarks
+        iter_data{i, 1} = a;               % xl
+        iter_data{i, 2} = b;               % xu
+        iter_data{i, 3} = c;               % xr
+        iter_data{i, 4} = error_percent;   % ϵa
+        iter_data{i, 5} = fa;              % f(xl)
+        iter_data{i, 6} = fb;              % f(xu)
+        iter_data{i, 7} = fc;              % f(xr)
+        iter_data{i, 8} = sign_check;      % f(xl)*f(xr)
+        iter_data{i, 9} = remarks;         % Remarks
+        
+        % Check for convergence
+        if abs(fc) < tol || error < tol
+            root = c;
+            % Trim unused rows
+            iter_data = iter_data(1:i, :);
+            return;
+        end
+        
+        % Update interval
+        if fa * fc < 0
+            b = c;
+            fb = fc;
+        else
+            a = c;
+            fa = fc;
+        end
+    end
+    
+    % If we reach here, we've hit max iterations
+    root = c;
+    iter_data = iter_data(1:max_iter, :);
+end
+
+% Newton-Raphson Method
+function [root, iter_data] = newton_raphson_method(func, dfunc, x0, tol, max_iter)
+    % Initialize
+    iter_data = cell(max_iter, 4);  % 4 columns based on the required format
+    x = x0;
+    
+    % Iteration loop
+    for i = 1:max_iter
+        % Compute function and derivative values
+        fx = func(x);
+        dfx = dfunc(x);
+        
+        % Check for zero derivative
+        if abs(dfx) < 1e-10
+            if i == 1
+                root = [];
+                return;
+            else
+                break;  % Use the last approximation
+            end
+        end
+        
+        % Compute next approximation
+        x_next = x - fx / dfx;
+        
+        % Calculate error
+        if i > 1
+            error = abs(x_next - x) / abs(x_next) * 100;  % Relative error as percentage
+        else
+            error = NaN;  % No previous value for first iteration
+        end
+        
+        % Store iteration data according to Newton-Raphson format
+        % xl, ϵa, f(x), f'(xu)
+        iter_data{i, 1} = x;               % xl
+        iter_data{i, 2} = error;           % ϵa
+        iter_data{i, 3} = fx;              % f(x)
+        iter_data{i, 4} = dfx;             % f'(xu)
+        
+        % Update x
+        x = x_next;
+        
+        % Check for convergence
+        if abs(fx) < tol || (i > 1 && error < tol)
+            root = x;
+            % Trim unused rows
+            iter_data = iter_data(1:i, :);
+            return;
+        end
+    end
+    
+    % If we reach here, we've hit max iterations
+    root = x;
+    iter_data = iter_data(1:max_iter, :);
+end
+
+% Secant Method
+function [root, iter_data] = secant_method(func, x0, x1, tol, max_iter)
+    % Initialize
+    iter_data = cell(max_iter, 7);  % 7 columns based on the required format
+    f0 = func(x0);
+    f1 = func(x1);
+    
+    % Iteration loop
+    for i = 1:max_iter
+        % Check for zero denominator
+        if abs(f1 - f0) < 1e-10
+            if i == 1
+                root = [];
+                return;
+            else
+                break;  % Use the last approximation
+            end
+        end
+        
+        % Compute next approximation
+        x2 = x1 - f1 * (x1 - x0) / (f1 - f0);
+        f2 = func(x2);
+        
+        % Calculate error
+        if i > 1
+            error = abs(x2 - x1) / abs(x2) * 100;  % Relative error as percentage
+        else
+            error = NaN;  % No previous value for first iteration
+        end
+        
+        % Store iteration data according to Secant format
+        % xi-1, xi, xi+1, ϵa, f(xi-1), f(xi), f(xi+1)
+        iter_data{i, 1} = x0;              % xi-1
+        iter_data{i, 2} = x1;              % xi
+        iter_data{i, 3} = x2;              % xi+1
+        iter_data{i, 4} = error;           % ϵa
+        iter_data{i, 5} = f0;              % f(xi-1)
+        iter_data{i, 6} = f1;              % f(xi)
+        iter_data{i, 7} = f2;              % f(xi+1)
+        
+        % Update values
+        x0 = x1;
+        f0 = f1;
+        x1 = x2;
+        f1 = f2;
+        
+        % Check for convergence
+        if abs(f1) < tol || (i > 1 && error < tol)
+            root = x1;
+            % Trim unused rows
+            iter_data = iter_data(1:i, :);
+            return;
+        end
+    end
+    
+    % If we reach here, we've hit max iterations
+    root = x1;
+    iter_data = iter_data(1:max_iter, :);
+end
+end
+
+% Function to remove "f(x) =" or similar prefix from input
+function clean_str = remove_function_prefix(input_str)
+% Check for common function prefixes and remove them
+% This handles patterns like "f(x) =", "y =", "f(x)=", etc.
+clean_str = regexprep(input_str, '^[a-zA-Z]+$$[a-zA-Z]$$\s*=\s*', '');
+clean_str = regexprep(clean_str, '^[a-zA-Z]+\s*=\s*', '');
+
+% If the string wasn't changed, it probably didn't have a prefix
+if strcmp(clean_str, input_str)
+    clean_str = input_str;
+end
+end
+
+% Function to convert natural math syntax to MATLAB syntax
+function matlab_str = convert_to_matlab_syntax(input_str)
+% Make a copy of the input string
+matlab_str = input_str;
+
+% STEP 1: Handle standalone 'e' as the mathematical constant
+% This regex looks for 'e' that is not part of a word and not followed by ^
+% Replace it with exp(1)
+matlab_str = regexprep(matlab_str, '(^|[^a-zA-Z0-9])e([^a-zA-Z0-9\^]|$)', '$1exp(1)$2');
+
+% STEP 2: Handle e^x notation (including e^-x without parentheses)
+% This regex looks for e^ followed by an optional - and then a variable or number
+matlab_str = regexprep(matlab_str, 'e\^(-?)([a-zA-Z0-9\.]+)', 'exp($1$2)');
+
+% STEP 3: Handle implicit multiplication (4x -> 4*x)
+% This regex looks for a number immediately followed by a variable
+matlab_str = regexprep(matlab_str, '(\d+)([a-zA-Z])', '$1*$2');
+
+% STEP 4: Handle coefficient(x) notation (3(x) -> 3*(x))
+% This regex looks for a number followed immediately by an opening parenthesis
+matlab_str = regexprep(matlab_str, '(\d+)(\()', '$1*$2');
+
+% STEP 5: Handle power operations (^ -> .^)
+% This regex looks for different patterns of power operations
+
+% Pattern 1: Variable followed by power operator and number/variable
+% Example: x^2 -> x.^2
+matlab_str = regexprep(matlab_str, '([a-zA-Z])(\^)([0-9\.a-zA-Z]+)', '$1.^$3');
+
+% Pattern 2: Closing parenthesis followed by power operator
+% Example: (x+1)^2 -> (x+1).^2
+matlab_str = regexprep(matlab_str, '(\))(\^)([0-9\.a-zA-Z]+)', '$1.^$3');
+
+% STEP 6: Handle multiplication operations (* -> .*)
+% Only convert * to .* when it's between a variable and another variable
+% We don't want to convert all multiplications, only those that might need it
+
+% Pattern: Variable followed by * and another variable
+% Example: x*y -> x.*y
+matlab_str = regexprep(matlab_str, '([a-zA-Z])(\*)([a-zA-Z])', '$1.*$3');
+
+% STEP 7: Handle division operations (/ -> ./)
+% Only convert / to ./ when it's between a variable and another variable
+
+% Pattern: Variable followed by / and another variable
+% Example: x/y -> x./y
+matlab_str = regexprep(matlab_str, '([a-zA-Z])(/)([a-zA-Z])', '$1./$3');
+
+% STEP 8: Handle common mathematical notations
+
+% Convert ln(x) to log(x)
+matlab_str = regexprep(matlab_str, 'ln\(', 'log(');
+
+return;
+end
